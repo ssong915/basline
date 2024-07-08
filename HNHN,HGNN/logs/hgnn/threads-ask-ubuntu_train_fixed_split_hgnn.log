@@ -1,0 +1,7 @@
+args: Namespace(aggregator='Maxmin', alpha_e=0, alpha_v=0, batch_size=32, dataset_name='threads-ask-ubuntu', dim_edge=128, dim_hidden=128, dim_time=128, dim_vertex=128, early_stop=10, epochs=50, eval_mode='train_fixed_split', exp_num=1, folder_name='logs/hgnn/threads-ask-ubuntu_train_fixed_split_hgnn', freq_size=2628000, gpu=0, lr=0.0001, model='hgnn', model_save='/home/dake/workspace/HNHN,HGNN/data/threads-ask-ubuntu/train_fixed_split/hgnn', neg_mode='sns', neg_ratio=1, neg_size=100, num_layers=2, seed=1111, time_split_type='sec', training='wgan')
+============================================ Experiments 111 ==================================================[0 epoch - Val AP : 0.8266117558420557 / AUROC : 0.8194462060928345 ]
+[1 epoch - Val AP : 0.8235387138858543 / AUROC : 0.8690013885498047 ]
+[2 epoch - Val AP : 0.8112784896352039 / AUROC : 0.8603667616844177 ]
+[3 epoch - Val AP : 0.8184481289091772 / AUROC : 0.8670603632926941 ]
+[4 epoch - Val AP : 0.8140430612719103 / AUROC : 0.8651677370071411 ]
+[5 epoch - Val AP : 0.8208383160162496 / AUROC : 0.8748821020126343 ]
