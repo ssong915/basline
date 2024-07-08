@@ -1,0 +1,119 @@
+'''
+Utilities functions for the framework.
+'''
+import math
+import numpy as np
+import argparse
+import torch
+import warnings
+warnings.filterwarnings('ignore')
+from sklearn import metrics
+from torchmetrics import AveragePrecision
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    
+    ##### training hyperparameter #####
+    parser.add_argument("--dataset_name", type=str, default='email-Enron', help='dataset name: cora, coraA, citeseer, pubmed, dblp, dblpA')
+    parser.add_argument("--seed", dest='fix_seed', action='store_const', default=False, const=True, help='Fix seed for reproducibility and fair comparison.')
+    parser.add_argument("--gpu", type=int, default=1, help='gpu number. -1 if cpu else gpu number')
+    parser.add_argument("--exp_num", default=1, type=int, help='number of experiments')
+    parser.add_argument("--epochs", default=50, type=int, help='number of epochs')
+    parser.add_argument("--bs", default=32, type=int, help='batch size')
+    parser.add_argument("--train_DG", default="epoch1:1", type=str, help='update ratio in epochs (D updates:G updates)')
+    parser.add_argument("--testns", type=str, default='SMCA', help='test negative sampler')
+    parser.add_argument("--clip", type=float, default='0.01', help='weight clipping')
+    parser.add_argument("--training", type=str, default='wgan', help='loss objective: wgan, none')
+    parser.add_argument("--D_lr", default=0.001, type=float, help='learning rate')
+    parser.add_argument("--G_lr", default=0.001, type=float, help='learning rate')
+    
+    parser.add_argument("--freq_size", default=2628000, type=int, help='batch size')
+    parser.add_argument("--train_mode", default="fixed-split", type=str, help='batch size')
+    parser.add_argument("--time_split_type", default='sec', type=str, help='batch size')
+    
+    parser.add_argument("--eval_mode", default='fixed_split', type=str, help='batch size')    
+    
+    ##### Discriminator architecture #####
+    parser.add_argument("--model", default='hnhn', type=str, help='discriminator: hnhn')
+    parser.add_argument("--n_layers", default=1, type=int, help='number of layers')
+    parser.add_argument("--alpha_e", default=0, type=float, help='normalization term for hnhn')
+    parser.add_argument("--alpha_v", default=0, type=float, help='normalization term for hnhn')
+    parser.add_argument("--dim_hidden", default=400, type=int, help='dimension of hidden vector')
+    parser.add_argument("--dim_vertex", default=400, type=int, help='dimension of vertex hidden vector')
+    parser.add_argument("--dim_edge", default=400, type=int, help='dimension of edge hidden vector')
+    parser.add_argument("--input_dim", default=400, type=int, help='dimension of edge hidden vector')
+    
+    ##### Generator architecture #####
+    parser.add_argument("--gen", type=str, default='MLP', help='generator: MLP')
+    
+    opt = parser.parse_args()
+    print(opt.gpu)
+    return opt
+     
+def gen_size_dist(hyperedges):
+    size_dist = {}
+    for edge in hyperedges:
+        leng = len(edge)
+        if leng not in size_dist :
+            size_dist[leng] = 0
+        size_dist[leng] += 1
+    if 1 in size_dist:
+        del size_dist[1]
+    if 2 in size_dist:
+        del size_dist[2]
+    total = sum(v for k, v in size_dist.items())
+    for i in size_dist:
+        size_dist[i] = float(size_dist[i]) / total
+    return size_dist  
+ 
+def unsqueeze_onehot(onehot):
+    edge_size = max(int(onehot.sum().item()), 1)
+    onehot_shape = onehot.shape[0]
+    unsqueeze = torch.zeros([edge_size, onehot_shape], device=onehot.device)
+    nonzero_idx = onehot.nonzero()
+    for i, idx in enumerate(nonzero_idx) :
+        unsqueeze[i][idx]=1
+    return unsqueeze 
+
+def measure(label, pred):
+    average_precision = AveragePrecision(task='binary')
+    auc_roc = metrics.roc_auc_score(np.array(label), np.array(pred))
+    ap = average_precision(torch.FloatTensor(pred), torch.LongTensor(label))
+    return auc_roc, ap
+
+def reindex_snapshot(snapshot_edges):
+    org_node_index = []
+    reindex_snapshot_edges = [[0 for _ in row] for row in snapshot_edges]
+    for i, edge in enumerate(snapshot_edges):
+        for j, node in enumerate(edge):
+            if node not in org_node_index:
+                org_node_index.append(node)
+            new_idx = org_node_index.index(node)
+            reindex_snapshot_edges[i][j] = new_idx
+    
+    return reindex_snapshot_edges, org_node_index
+
+
+def split_edges(dataset, time_info):
+
+    time_hyperedge = (dataset)
+    snapshot_time = (time_info)
+    total_size = len(time_hyperedge)
+    idcs = np.arange(len(time_hyperedge)).tolist()
+    
+    test_label_size = int(math.ceil(total_size * 0.1))
+    test_size = int(math.ceil(total_size * 0.1))
+    valid_size = int(math.ceil(total_size * 0.2))
+    
+    test_label = time_hyperedge[-test_label_size:].tolist()
+    
+    test_hyperedge = time_hyperedge[-(test_label_size + test_size):-test_label_size].tolist()
+    test_time = snapshot_time[-(test_label_size + test_size):-test_label_size].tolist()
+    
+    valid_hyperedge = time_hyperedge[-(test_label_size + test_size + valid_size):-(test_label_size + test_size)].tolist()
+    valid_time = snapshot_time[-(test_label_size + test_size + valid_size):-(test_label_size + test_size)].tolist()
+    
+    train_hyperedge = time_hyperedge[:-(test_label_size + test_size + valid_size)]
+    train_time = snapshot_time[:-(test_label_size + test_size + valid_size)]        
+
+    return train_hyperedge, train_time, valid_hyperedge, valid_time, test_hyperedge, test_time, test_label
